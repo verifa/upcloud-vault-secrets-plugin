@@ -54,8 +54,22 @@ func newBackend() (*backend, error) {
 		BackendType: logical.TypeLogical,
 		Paths: framework.PathAppend(
 			configPaths(),
-			subaccountPaths(),
+			b.subaccountPaths(),
 		),
+		Secrets: []*framework.Secret{
+			{
+				Type: "mike",
+				Fields: map[string]*framework.FieldSchema{
+					"beer": {
+						Required: true,
+						Type:     framework.TypeString,
+					},
+				},
+				Revoke: func(c context.Context, r *logical.Request, fd *framework.FieldData) (*logical.Response, error) {
+					return logical.ErrorResponse("mike was 'ere: %v", fd), fmt.Errorf("mike was 'ere: %v", fd)
+				},
+			},
+		},
 	}
 
 	return b, nil
