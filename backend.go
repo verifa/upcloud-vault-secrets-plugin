@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -54,62 +53,12 @@ func newBackend() (*backend, error) {
 		Help:        strings.TrimSpace(mockHelp),
 		BackendType: logical.TypeLogical,
 		Paths: framework.PathAppend(
-			b.paths(),
+			configPaths(),
+			subaccountPaths(),
 		),
 	}
 
 	return b, nil
-}
-
-func (b *backend) paths() []*framework.Path {
-	return []*framework.Path{
-		{
-			Pattern: "config",
-
-			Fields: map[string]*framework.FieldSchema{
-				"username": {
-					Type:        framework.TypeString,
-					Required:    true,
-					Description: "Specifies the upcloud Admin username to authenticate.",
-				},
-				"password": {
-					Type:        framework.TypeString,
-					Required:    true,
-					Description: "Specifies the upcloud Admin username's password to authenticate.",
-				},
-			},
-
-			Operations: map[logical.Operation]framework.OperationHandler{
-				logical.ReadOperation: &framework.PathOperation{
-					Callback: handleConfigRead,
-					Summary:  "Retrieve the secret from the map.",
-				},
-				logical.UpdateOperation: &framework.PathOperation{
-					Callback: handleConfigWrite,
-					Summary:  "Store a secret at the specified location.",
-				},
-				logical.CreateOperation: &framework.PathOperation{
-					Callback: handleConfigWrite,
-					Summary:  "Store a secret at the specified location.",
-				},
-				logical.DeleteOperation: &framework.PathOperation{
-					Callback: handleConfigDelete,
-					Summary:  "Deletes the secret at the specified location.",
-				},
-			},
-
-			ExistenceCheck: b.handleExistenceCheck,
-		},
-	}
-}
-
-func (b *backend) handleExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
-	out, err := req.Storage.Get(ctx, req.Path)
-	if err != nil {
-		return false, errwrap.Wrapf("existence check failed: {{err}}", err)
-	}
-
-	return out != nil, nil
 }
 
 const mockHelp = `
