@@ -2,7 +2,7 @@ package upcloud
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -17,6 +17,14 @@ type backend struct {
 	*framework.Backend
 
 	store map[string][]byte
+}
+
+type upcloudAuth struct {
+	// Admin username for upcloud auth
+	Username string `json:"username"`
+
+	// Admin password for upcloud auth
+	Password string `json:"password"`
 }
 
 var _ logical.Factory = Factory
@@ -58,12 +66,18 @@ func newBackend() (*backend, error) {
 func (b *backend) paths() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: framework.MatchAllRegex("path"),
+			Pattern: "config",
 
 			Fields: map[string]*framework.FieldSchema{
-				"path": {
+				"username": {
 					Type:        framework.TypeString,
-					Description: "Specifies the path of the secret.",
+					Required:    true,
+					Description: "Specifies the upcloud Admin username to authenticate.",
+				},
+				"password": {
+					Type:        framework.TypeString,
+					Required:    true,
+					Description: "Specifies the upcloud Admin username's password to authenticate.",
 				},
 			},
 
@@ -75,9 +89,6 @@ func (b *backend) paths() []*framework.Path {
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback: b.handleWrite,
 					Summary:  "Store a secret at the specified location.",
-				},
-				logical.CreateOperation: &framework.PathOperation{
-					Callback: b.handleWrite,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
 					Callback: b.handleDelete,
@@ -136,16 +147,29 @@ func (b *backend) handleWrite(ctx context.Context, req *logical.Request, data *f
 		return nil, fmt.Errorf("data must be provided to store in secret")
 	}
 
-	path := data.Get("path").(string)
+	username := data.Get("username")
+	if username == nil {
+		return nil, errors.New("must provide a username")
 
-	// JSON encode the data
-	buf, err := json.Marshal(req.Data)
-	if err != nil {
-		return nil, errwrap.Wrapf("json encoding failed: {{err}}", err)
 	}
 
-	// Store kv pairs in map at specified path
-	b.store[req.ClientToken+"/"+path] = buf
+	password := data.Get("password")
+	if password == nil {
+		return nil, errors.New("must provide a password")
+
+	}
+
+	entry, err := logical.StorageEntryJSON("credentials", upcloudAuth{
+		Username: username.(string),
+		Password: password.(string),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal json for upcloud auth: %w", err)
+	}
+
+	if err := req.Storage.Put(ctx, entry); err != nil {
+		return nil, fmt.Errorf("could not put upcloudAuth to storage: %w", err)
+	}
 
 	return nil, nil
 }
