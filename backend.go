@@ -2,13 +2,11 @@ package upcloud
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/sdk/framework"
-	"github.com/hashicorp/vault/sdk/helper/jsonutil"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
@@ -83,15 +81,19 @@ func (b *backend) paths() []*framework.Path {
 
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ReadOperation: &framework.PathOperation{
-					Callback: b.handleRead,
+					Callback: handleConfigRead,
 					Summary:  "Retrieve the secret from the map.",
 				},
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback: b.handleWrite,
+					Callback: handleConfigWrite,
+					Summary:  "Store a secret at the specified location.",
+				},
+				logical.CreateOperation: &framework.PathOperation{
+					Callback: handleConfigWrite,
 					Summary:  "Store a secret at the specified location.",
 				},
 				logical.DeleteOperation: &framework.PathOperation{
-					Callback: b.handleDelete,
+					Callback: handleConfigDelete,
 					Summary:  "Deletes the secret at the specified location.",
 				},
 			},
@@ -108,83 +110,6 @@ func (b *backend) handleExistenceCheck(ctx context.Context, req *logical.Request
 	}
 
 	return out != nil, nil
-}
-
-func (b *backend) handleRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	if req.ClientToken == "" {
-		return nil, fmt.Errorf("client token empty")
-	}
-
-	path := data.Get("path").(string)
-
-	// Decode the data
-	var rawData map[string]interface{}
-	fetchedData := b.store[req.ClientToken+"/"+path]
-	if fetchedData == nil {
-		resp := logical.ErrorResponse("No value at %v%v", req.MountPoint, path)
-		return resp, nil
-	}
-
-	if err := jsonutil.DecodeJSON(fetchedData, &rawData); err != nil {
-		return nil, errwrap.Wrapf("json decoding failed: {{err}}", err)
-	}
-
-	// Generate the response
-	resp := &logical.Response{
-		Data: rawData,
-	}
-
-	return resp, nil
-}
-
-func (b *backend) handleWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	if req.ClientToken == "" {
-		return nil, fmt.Errorf("client token empty")
-	}
-
-	// Check to make sure that kv pairs provided
-	if len(req.Data) == 0 {
-		return nil, fmt.Errorf("data must be provided to store in secret")
-	}
-
-	username := data.Get("username")
-	if username == nil {
-		return nil, errors.New("must provide a username")
-
-	}
-
-	password := data.Get("password")
-	if password == nil {
-		return nil, errors.New("must provide a password")
-
-	}
-
-	entry, err := logical.StorageEntryJSON("credentials", upcloudAuth{
-		Username: username.(string),
-		Password: password.(string),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not marshal json for upcloud auth: %w", err)
-	}
-
-	if err := req.Storage.Put(ctx, entry); err != nil {
-		return nil, fmt.Errorf("could not put upcloudAuth to storage: %w", err)
-	}
-
-	return nil, nil
-}
-
-func (b *backend) handleDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	if req.ClientToken == "" {
-		return nil, fmt.Errorf("client token empty")
-	}
-
-	path := data.Get("path").(string)
-
-	// Remove entry for specified path
-	delete(b.store, req.ClientToken+"/"+path)
-
-	return nil, nil
 }
 
 const mockHelp = `
