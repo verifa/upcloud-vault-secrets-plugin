@@ -21,7 +21,7 @@ type upcloudSubaccount struct {
 	Email    string `json:"email"`
 }
 
-func (b *backend) subaccountPaths() []*framework.Path {
+func subaccountPaths(b *backend) []*framework.Path {
 	return []*framework.Path{
 		{
 			Pattern: "subaccount/" + framework.GenericNameRegex("subaccount"),
@@ -92,7 +92,7 @@ func (b *backend) handleSubaccountWrite(ctx context.Context, req *logical.Reques
 	}
 
 	if err := req.Storage.Put(ctx, entry); err != nil {
-		return nil, fmt.Errorf("could not put upcloudAuth to storage: %w", err)
+		return nil, fmt.Errorf("could not put upcloudConfig to storage: %w", err)
 	}
 
 	return nil, nil
@@ -127,7 +127,7 @@ func (b *backend) handleSubaccountTokenRead(ctx context.Context, req *logical.Re
 	if configEntry == nil {
 		return logical.ErrorResponse("backend config not configured"), nil
 	}
-	var auth upcloudAuth
+	var auth upcloudConfig
 	if err := configEntry.DecodeJSON(&auth); err != nil {
 		return nil, fmt.Errorf("could not decode backend config: %w", err)
 	}

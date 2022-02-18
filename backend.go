@@ -9,24 +9,13 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-// backend wraps the backend framework and adds a map for storing key value pairs
 type backend struct {
 	*framework.Backend
-
-	store map[string][]byte
-}
-
-type upcloudAuth struct {
-	// Admin username for upcloud auth
-	Username string `json:"username"`
-
-	// Admin password for upcloud auth
-	Password string `json:"password"`
 }
 
 var _ logical.Factory = Factory
 
-// Factory configures and returns Mock backends
+// Factory configures the upcloud backend
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
 	b, err := newBackend()
 	if err != nil {
@@ -45,30 +34,17 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 }
 
 func newBackend() (*backend, error) {
-	b := &backend{
-		store: make(map[string][]byte),
-	}
+	b := &backend{}
 
 	b.Backend = &framework.Backend{
 		Help:        strings.TrimSpace(mockHelp),
 		BackendType: logical.TypeLogical,
 		Paths: framework.PathAppend(
-			configPaths(),
-			b.subaccountPaths(),
+			configPaths(b),
+			subaccountPaths(b),
 		),
 		Secrets: []*framework.Secret{
-			{
-				Type: "mike",
-				Fields: map[string]*framework.FieldSchema{
-					"beer": {
-						Required: true,
-						Type:     framework.TypeString,
-					},
-				},
-				Revoke: func(c context.Context, r *logical.Request, fd *framework.FieldData) (*logical.Response, error) {
-					return logical.ErrorResponse("mike was 'ere: %v", fd), fmt.Errorf("mike was 'ere: %v", fd)
-				},
-			},
+			secretSubAccount(b),
 		},
 	}
 
